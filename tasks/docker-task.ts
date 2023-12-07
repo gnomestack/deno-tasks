@@ -1,105 +1,94 @@
-import { IPartialDockerTask, ITaskBuilder, ITaskContext } from "./interfaces.ts";
-import { getTasks } from "./task-collection.ts";
-import { ps, splitArguments } from "../deps.ts";
-import { hbs } from "../hbs/mod.ts";
-import { cwd } from "https://deno.land/x/gs_std@0.0.1/ps/_base.ts";
+import { InvalidCastException, isNullOrWhiteSpace, ps, splitArguments, startsWithIgnoreCase } from "../deps.ts";
+import { PackageTask } from "./fire-tasks.ts";
+import { registerTaskHandler } from "./task-handlers.ts";
+import { IFireTaskExecutionContext, TaskResult } from "./types.ts";
+import { mapPackageTask } from "./utils.ts";
 
-export function dockerTask(task: IPartialDockerTask): ITaskBuilder {
-    const tasks = getTasks();
-    const wrap = async function (state: ITaskContext, signal?: AbortSignal): Promise<Record<string, unknown>> {
-        const task = state.task;
+export class DockerTask extends PackageTask {
+    constructor() {
+        super();
+        this.uses = "apt";
+    }
+}
 
-        const envData : Record<string, string> = {};
+export async function handleDockerTask(ctx: IFireTaskExecutionContext) {
+    const task = ctx.task as DockerTask;
+    const result = new TaskResult(task);
+    result.status = "running";
 
-        if (typeof task["with"] === "object") {
-            const withSet = task["with"] as Record<string, string | undefined>;
-            for(const key in withSet as Record<string, string | undefined>) {
-                const value = withSet[key];
-                if(typeof value === "string") {
-                    if (value.includes("{{") && value.includes("}}")) {
-                        const template = hbs.compile(value);
-                        const result = template(state);
-                        envData[key] = result;
-                        continue;
-                    }
-                    envData[key] = value;
-                }
+    if (ctx.signal.aborted) {
+        result.status = "cancelled";
+        return result;
+    }
+
+    const name = task.name || task.id;
+    if (!(task instanceof DockerTask)) {
+        throw new InvalidCastException(`Task ${name} is not DockerTask`);
+    }
+
+    const entrypoint = task.with.entrypoint as string;
+    const args = task.with.args;
+    const cwd = task.cwd ?? ps.cwd;
+    const splat: string[] = [
+        "run",
+        "--rm",
+        "--volume",
+        `${cwd}:/opt/work`,
+        "--workdir",
+        `/opt/work`,
+    ];
+
+    if (
+        entrypoint && typeof entrypoint === "string" &&
+        !isNullOrWhiteSpace(entrypoint)
+    ) {
+        splat.push("--entrypoint", entrypoint);
+    }
+
+    if (task.env) {
+        for (const [key, value] of Object.entries(task.env)) {
+            splat.push("--env", `\"${key}=${value}\"`);
+        }
+    }
+
+    // docker://
+    const image = task.uses.substring(9);
+    splat.push(image);
+
+    if (args && Array.isArray(args)) {
+        splat.push(...args);
+    } else if (args && typeof args === "string") {
+        splat.push(...splitArguments(args));
+    }
+
+    const lr = await ps.exec("docker", splat, {
+        stdout: "piped",
+        stderr: "piped",
+        signal: ctx.signal,
+        cwd: cwd,
+        env: task.env,
+    });
+
+    lr.throwOrContinue();
+    return result;
+}
+
+registerTaskHandler(
+    "docker",
+    (model) => {
+        if (model["uses"]) {
+            const uses = model["uses"] as string;
+            if (startsWithIgnoreCase(uses, "docker://")) {
+                return true;
             }
         }
 
-        const image = task["image"] as string;
-        if (typeof image !== "string") {
-            throw new Error("image is required and it must be a string");
-        }
-
-        const entrypoint = envData["entrypoint"];
-        if (entrypoint) {
-            delete envData["entrypoint"];
-        }
-
-        const args = task["args"] as string;
-        if (typeof args === "string") {
-            delete envData["args"];
-        }
-
-        let pwd = task["cwd"] as string;
-        if (typeof pwd === "string") {
-            delete envData["cwd"];
-        }
-        else 
-        {
-            pwd = cwd();
-        }
-
-        const dockerArgs = splitArguments(args);
-
-
-        state = {
-            ...state,
-            env: envData,
-        };
-
-        const splat = ["run", "--rm", "--workdir", pwd];
-
-        for(const key in envData) {
-            const value = envData[key];
-            splat.push("-e", `${key}=${value}`);
-        }
-
-        splat.push(image);
-
-        if (entrypoint) {
-            splat.push(entrypoint);
-        }
-
-        splat.push(...dockerArgs);
-
-        const r = await ps.exec("docker", splat, {
-            signal: signal,
-        })
-
-        r.throwOrContinue();
-
-        return {
-            image: image,
-            entrypoint: entrypoint,
-            args: dockerArgs,
-            exitCode: r.code,
-            stdout: r.stdout,
-            stderr: r.stderr,
-        };
-    }
-
-    return tasks.add({
-        id: task.id,
-        name: task.name ?? task.id,
-        description: task.description,
-        deps: task.deps ?? [],
-        timeout: task.timeout,
-        force: task.force,
-        skip: task.skip,
-        run: wrap,
-        with: task.with,
-        cwd: task.cwd,
-    });
-}
+        return false;
+    },
+    (task) => task instanceof DockerTask,
+    handleDockerTask,
+    (model) => {
+        const task = new DockerTask();
+        return mapPackageTask(model, task);
+    },
+);

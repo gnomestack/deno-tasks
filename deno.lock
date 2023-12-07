@@ -54,6 +54,7 @@
     }
   },
   "redirects": {
+    "https://deno.land/x/gs_std/os/mod.ts": "https://deno.land/x/gs_std@0.0.1/os/mod.ts",
     "https://deno.land/x/gs_std/path/os.ts": "https://deno.land/x/gs_std@0.0.1/path/os.ts"
   },
   "remote": {}

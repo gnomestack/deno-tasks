@@ -1,5 +1,4 @@
-
-import { isNullOrEmpty, isNullOrWhiteSpace, trim, trimEnd, trimStart, inflections } from "../deps.ts";
+import { inflections, isNullOrEmpty, isNullOrWhiteSpace, trim, trimEnd, trimStart } from "../deps.ts";
 
 export const stringHelpers = {
     trim: function (str: string, chars?: string) {

@@ -1,181 +1,101 @@
-import { IPartialShellFileTask, IPartialShellTask, ITask, ITaskBuilder, ITaskContext } from "./interfaces.ts";
-import { getTasks } from "./task-collection.ts";
-import { os, exec, run } from "../deps.ts";
+import { InvalidCastException, isNullOrWhiteSpace, os, shell } from "../deps.ts";
+import { hbs } from "../hbs/mod.ts";
+import { FireTask } from "./fire-tasks.ts";
+import { registerTaskHandler } from "./task-handlers.ts";
+import { IFireTaskExecutionContext, TaskResult } from "./types.ts";
+import { mapFireTask } from "./utils.ts";
 
-export function shellTask(task: IPartialShellTask): ITaskBuilder;
-export function shellTask(id: string, shell: string, script: string): ITaskBuilder;
-export function shellTask(id: string, script: string): ITaskBuilder;
-export function shellTask(): ITaskBuilder {
-    const tasks = getTasks();
-    const id = arguments[0] as string;
-    let shell = os.isWindows ? "powershell" : "bash";
-    let script = "";
-    switch (arguments.length) {
-        case 1: {
-            if (!(typeof arguments[0] === "object")) {
-                throw new Error(`Excpected object for argument 'task'`);
-            }
+export class ShellTask extends FireTask {
+    run:
+        | string
+        | ((ctx: IFireTaskExecutionContext) => Promise<string>)
+        | ((ctx: IFireTaskExecutionContext) => string);
+    shell?: string;
 
-            const task = arguments[0] as IPartialShellTask;
-            const wrap = async function (_state: ITaskContext, signal?: AbortSignal): Promise<Record<string, unknown>> {
-                const out = await exec(shell, script, {
-                    signal: signal,
-                });
-                out.throwOrContinue();
-                return {
-                    exitCode: out.code,
-                    stdout: out.stdout,
-                    stderr: out.stderr,
-                } as Record<string, unknown>;
-            };
-            return tasks.add({
-                id: task.id,
-                name: task.name ?? task.id,
-                description: task.description,
-                deps: task.deps ?? [],
-                timeout: task.timeout,
-                force: task.force,
-                skip: task.skip,
-                run: wrap,
-            });
-        }
-        case 2:
-            script = arguments[1] as string;
-            break;
-        case 3:
-            shell = arguments[1] as string;
-            script = arguments[2] as string;
-            break;
-
-        default:
-            throw new Error("Invalid arguments");
+    constructor() {
+        super();
+        this.run = "";
     }
-
-    const wrap = async function (_state: ITaskContext, signal?: AbortSignal): Promise<Record<string, unknown>> {
-        const out = await exec(shell, script, {
-            signal: signal,
-        });
-        out.throwOrContinue();
-        return {
-            exitCode: out.code,
-            stdout: out.stdout,
-            stderr: out.stderr,
-        };
-    };
-
-    const task: ITask = {
-        id,
-        name: id,
-        description: undefined,
-        deps: [],
-        timeout: undefined,
-        run: wrap,
-    };
-
-    return tasks.add(task);
 }
 
-export function shellFileTask(task: IPartialShellTask): ITaskBuilder;
-export function shellFileTask(id: string, file: string): ITaskBuilder;
-export function shellFileTask(id: string, shell: string, file: string): ITaskBuilder;
-export function shellFileTask(): ITaskBuilder {
-    const tasks = getTasks();
-    const id = arguments[0] as string;
+export async function handleShellTask(ctx: IFireTaskExecutionContext) {
+    const task = ctx.task as ShellTask;
+    const result = new TaskResult(task);
+    result.status = "running";
 
-    let shell = os.isWindows ? "powershell" : "bash";
-    let file = "";
-    switch (arguments.length) {
-        case 1: {
-            if (!(typeof arguments[0] === "object")) {
-                throw new Error(`Excpected object for argument 'task'`);
-            }
+    if (ctx.signal.aborted) {
+        result.status = "cancelled";
+        return result;
+    }
 
-            const task = arguments[0] as IPartialShellFileTask;
-            const file = task.file;
-            shell = task.shell ?? shell;
-            if (!shell) {
-                const text = Deno.readTextFileSync(file);
-                const firstLine = text.split(os.newLine)[0];
-                if (firstLine.startsWith("#!")) {
-                    const cmd = firstLine.substring(2).trim();
-                    const parts = cmd.split(" ").map((s) => s.trim()).filter((s) => s.length > 0);
-                    shell = parts[0];
-                    if ((shell === "env" || shell === "/usr/bin/env") && parts.length > 1) {
-                        shell = parts[1];
-                    }
+    const name = task.name || task.id;
+    if (!(task instanceof ShellTask)) {
+        throw new InvalidCastException(`Task ${name} is not a ShellTask`);
+    }
 
-                    if (shell.endsWith(".exe")) {
-                        shell = shell.substring(0, shell.length - 4);
-                    }
-                }
-            }
+    if (
+        ctx.defaults.shell && typeof (ctx.defaults.shell) === "string" &&
+        !isNullOrWhiteSpace(ctx.defaults.shell)
+    ) {
+        task.shell = ctx.defaults.shell;
+        ctx.bus.info(`Using default shell: ${task.shell}`);
+    } else {
+        task.shell = os.isWindows ? "powershell" : "bash";
+        ctx.bus.info(`Using default shell: ${task.shell}`);
+    }
+    let run = task.run;
+    if (typeof run === "function") {
+        const result = run(ctx);
+        if (result instanceof Promise) {
+            run = await result;
+        } else {
+            run = result;
+        }
+    }
 
-            const wrap = async function (_state: ITaskContext, signal?: AbortSignal): Promise<Record<string, unknown>> {
-                const out = await run(shell, file, {
-                    signal: signal,
-                });
-                out.throwOrContinue();
-                return {
-                    exitCode: out.code,
-                    stdout: out.stdout,
-                    stderr: out.stderr,
+    const r = await shell.run(task.shell, run, {
+        cwd: task.cwd,
+        env: task.env,
+        signal: ctx.signal,
+    });
+
+    r.throwOrContinue();
+    result.status = "completed";
+    return result;
+}
+
+registerTaskHandler(
+    "shell",
+    (model) => {
+        if (model["run"] && typeof model["run"] === "string" && !model["uses"]) {
+            return true;
+        }
+
+        return false;
+    },
+    (task) => task instanceof ShellTask,
+    handleShellTask,
+    (model) => {
+        const task = new ShellTask();
+        if (model["run"] && typeof model["run"] === "string") {
+            const run = model["run"] as string;
+            if (run.includes("{{")) {
+                task.run = (ctx) => {
+                    const model = {
+                        env: ctx.env,
+                        task: ctx.task,
+                        defaults: ctx.defaults,
+                        secrets: ctx.secrets,
+                    };
+                    const tpl = hbs.compile(run);
+                    const output = tpl(model);
+                    return output;
                 };
-            };
-
-            return tasks.add({
-                id: task.id,
-                name: task.name ?? task.id,
-                description: task.description,
-                deps: task.deps ?? [],
-                timeout: task.timeout,
-                force: task.force,
-                skip: task.skip,
-                run: wrap,
-            });
-        }
-        case 2:
-            {
-                file = (arguments[1] as string).trim();
-                const text = Deno.readTextFileSync(file);
-                const firstLine = text.split("\n")[0];
-                if (firstLine.startsWith("#!")) {
-                    const cmd = firstLine.substring(2).trim();
-                    const parts = cmd.split(" ").map((s) => s.trim()).filter((s) => s.length > 0);
-                    shell = parts[0];
-                    if ((shell === "env" || shell === "/usr/bin/env") && parts.length > 1) {
-                        shell = parts[1];
-                    }
-
-                    if (shell.endsWith(".exe")) {
-                        shell = shell.substring(0, shell.length - 4);
-                    }
-                }
+            } else {
+                task.run = run;
             }
-            break;
-        case 3:
-            shell = arguments[1] as string;
-            file = (arguments[2] as string).trim();
-            break;
+        }
 
-        default:
-            throw new Error("Invalid arguments");
-    }
-
-    const wrap = async function (_state: ITaskContext, signal?: AbortSignal): Promise<void> {
-        const out = await run(shell, file, {
-            signal: signal,
-        });
-        out.throwOrContinue();
-    };
-
-    const task: ITask = {
-        id,
-        name: id,
-        description: undefined,
-        deps: [],
-        timeout: undefined,
-        run: wrap,
-    };
-
-    return tasks.add(task);
-}
+        return mapFireTask(model, task);
+    },
+);

@@ -7,7 +7,6 @@ export { envHelpers, handlebars, stringHelpers, typeHelpers };
 
 export const hbs = handlebars.create();
 
-
 export function registerDefault(hb?: typeof handlebars) {
     registerHelpers(envHelpers, hb);
     registerHelpers(stringHelpers, hb);
