@@ -1,4 +1,4 @@
-import { IMessageBus } from "../message-bus/message-bus.ts";
+import { IMessageBus } from "../message-bus/mod.ts";
 
 export type ExecutionStatus =
     | "none"

@@ -9,6 +9,8 @@ export interface IFireTask {
     id: string;
     name?: string;
     env: Record<string, string>;
+    needs?: string[];
+    description?: string;
     timeout?:
         | number
         | ((ctx: IFireTaskExecutionContext) => number)

@@ -1,4 +1,4 @@
-import { IMessageBus, MessageBus } from "../message-bus/message-bus.ts";
+import { IMessageBus, MessageBus } from "../message-bus/mod.ts";
 
 export class ExecutionContext {
     bus: IMessageBus;

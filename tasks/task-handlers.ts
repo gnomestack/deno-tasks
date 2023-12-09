@@ -18,7 +18,13 @@ export function registerTaskHandler(
     handler: FireTaskHandler,
     map: (task: Record<string, unknown>) => IFireTask,
 ) {
-    registry[id] = { id, handler, test, testTask, map };
+    registry[id] = {
+        id: id,
+        test: test,
+        testTask: testTask,
+        handler: handler,
+        map: map,
+    };
 }
 
 export function getTaskHandlerEntry(id: string): ITaskHandlerEntry | undefined {

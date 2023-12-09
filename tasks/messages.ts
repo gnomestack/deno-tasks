@@ -1,4 +1,4 @@
-import { Message } from "../message-bus/message-bus.ts";
+import { Message } from "../message-bus/mod.ts";
 import { IFireTask, ITaskResult } from "./types.ts";
 
 export class TaskTimeoutMessage extends Message {
@@ -37,7 +37,7 @@ export class TaskCancellationMessage extends Message {
     }
 }
 
-export class TaskResultsMessage extends Message {
+export class TaskSummaryMessage extends Message {
     constructor(public readonly taskResults: ITaskResult[]) {
         super("tasks-summary");
     }

@@ -1,0 +1,26 @@
+
+tasks:
+  hello: 
+    run: |
+      echo "land ho"
+  test:
+    run: |
+      Write-Host "Hello World"
+    shell: pwsh
+
+  has_deps:
+    run: |
+      Write-Host "Hello Moon"
+    needs:
+      - hello
+    shell: pwsh
+  docker:
+    uses: docker://ubuntu
+    with:
+      args: bash -c 'echo hello world && echo \"$PWD\" && ls -la'
+
+jobs:
+  test:
+    steps:
+      - hello
+      - test

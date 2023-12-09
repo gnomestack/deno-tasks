@@ -1,5 +1,6 @@
-import { TimeoutException } from "../deps.ts";
+import { TimeoutException, yellow } from "../deps.ts";
 import { IExecutionContext } from "../execution/types.ts";
+import { GroupEndMessage, GroupStartMessage } from "../message-bus/mod.ts";
 import { FireTask } from "./fire-tasks.ts";
 import { TaskExecutionContext } from "./task-execution-context.ts";
 import { findTaskHandlerEntryByTask } from "./task-handlers.ts";
@@ -8,15 +9,16 @@ import { IFireTaskExecutionContext, ITaskResult, TaskResult } from "./types.ts";
 export async function runTasks(tasks: FireTask[], ctx: IExecutionContext) {
     const results: ITaskResult[] = [];
     let failed = false;
+    let targetCtx = ctx;
     for (const task of tasks) {
         const nextCtx = new TaskExecutionContext(
             task,
-            ctx.defaults,
-            ctx.bus,
-            ctx.outputs,
-            ctx.signal,
-            ctx.env,
-            ctx.secrets,
+            targetCtx.defaults,
+            targetCtx.bus,
+            targetCtx.outputs,
+            targetCtx.signal,
+            targetCtx.env,
+            targetCtx.secrets,
         );
         const result = await runTask(nextCtx, failed);
         results.push(result);
@@ -24,7 +26,8 @@ export async function runTasks(tasks: FireTask[], ctx: IExecutionContext) {
             failed = true;
         }
 
-        ctx = nextCtx;
+        ctx.outputs = nextCtx.outputs;
+        targetCtx = nextCtx;
     }
 
     return results;
@@ -37,6 +40,7 @@ export async function runTask(
     let timedOut = false;
     let complete = () => {};
     const task = ctx.task;
+    const name = task.name || task.id;
     try {
         if (ctx.signal.aborted) {
             const result = new TaskResult(task);
@@ -70,7 +74,7 @@ export async function runTask(
             result.startAt = start;
             result.endAt = start;
             result.status = "skipped";
-            ctx.bus.info(`Skipping task ${task.id}`);
+            ctx.bus.send(new GroupStartMessage(`${name} (${yellow("skipped")})`));
             return result;
         }
 
@@ -107,6 +111,8 @@ export async function runTask(
             };
         }
 
+        ctx.bus.send(new GroupStartMessage(name));
+
         const entry = findTaskHandlerEntryByTask(task);
         if (!entry) {
             throw new Error(`No task handler found for task ${task.id}`);
@@ -122,9 +128,9 @@ export async function runTask(
         result.endAt = new Date();
         const o = result.outputs;
         const no = { ...ctx.outputs };
-        for (const k in o) {
-            no[`${task.id}.${k}`] = o[k];
-        }
+        no[task.id] = {
+            outputs: o,
+        };
         ctx.outputs = no;
         return result;
     } catch (err) {
@@ -139,6 +145,7 @@ export async function runTask(
         ctx.bus.error(err);
         return result;
     } finally {
+        ctx.bus.send(new GroupEndMessage(name));
         complete();
     }
 }

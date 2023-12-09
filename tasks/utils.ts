@@ -143,5 +143,9 @@ export function mapFireTask(
         task.cwd = model["cwd"];
     }
 
+    if (model["needs"] && Array.isArray(model["needs"])) {
+        task.needs = model["needs"] as string[];
+    }
+
     return task;
 }

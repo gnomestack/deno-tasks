@@ -1,15 +1,15 @@
-import { get, has, set } from "../../os/env.ts";
+import { env } from "../deps.ts";
 
 export const envHelpers = {
     "env-get": function (v: string) {
-        return get(v);
+        return env.get(v);
     },
 
     "env-has": function (v: string) {
-        return has(v);
+        return env.has(v);
     },
 
     "env-set": function (k: string, v: string) {
-        set(k, v);
+        env.set(k, v);
     },
 };

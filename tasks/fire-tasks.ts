@@ -25,6 +25,10 @@ export abstract class FireTask implements IFireTask {
 
     cwd?: string;
 
+    description?: string;
+
+    needs?: string[];
+
     constructor() {
         this.id = "";
         this.env = {};

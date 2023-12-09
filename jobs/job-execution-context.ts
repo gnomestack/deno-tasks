@@ -1,14 +1,14 @@
 import { ExecutionContext } from "../execution/execution-context.ts";
 import { IMessageBus } from "../message-bus/mod.ts";
-import { IFireTask, IFireTaskExecutionContext } from "./types.ts";
+import { IFireJob, IFireJobExecutionContext } from "./types.ts";
 
-export class TaskExecutionContext extends ExecutionContext implements IFireTaskExecutionContext {
-    readonly task: IFireTask;
+export class JobExecutionContext extends ExecutionContext implements IFireJobExecutionContext {
+    readonly job: IFireJob;
 
     defaults: Record<string, unknown> = {};
 
     constructor(
-        task: IFireTask,
+        job: IFireJob,
         defaults?: Record<string, unknown>,
         bus?: IMessageBus,
         outputs?: Record<string, unknown>,
@@ -17,6 +17,6 @@ export class TaskExecutionContext extends ExecutionContext implements IFireTaskE
         secrets?: Record<string, string | undefined>,
     ) {
         super(defaults, bus, outputs, signal, env, secrets);
-        this.task = task;
+        this.job = job;
     }
 }
