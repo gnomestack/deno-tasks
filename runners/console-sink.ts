@@ -31,30 +31,26 @@ export function writeVersion() {
 
 export function listTasks(tasks: TaskCollection) {
     const hostWriter = getHostWriter();
-    hostWriter.writeLine();
-    hostWriter.writeLine(`TASKS:`);
     const maxTask = tasks
         .toArray()
         .map((t) => t.id.length)
         .reduce((a, b) => Math.max(a, b), 0);
     for (const task of tasks) {
         hostWriter.writeLine(
-            `  ${task.id.padEnd(maxTask)}  ${task.description ?? ""}`,
+            `${task.id.padEnd(maxTask)}  ${task.description ?? ""}`,
         );
     }
 }
 
 export function listJobs(jobs: JobCollection) {
     const hostWriter = getHostWriter();
-    hostWriter.writeLine();
-    hostWriter.writeLine(`JOBS:`);
     const maxTask = jobs
         .toArray()
         .map((t) => t.id.length)
         .reduce((a, b) => Math.max(a, b), 0);
     for (const job of jobs) {
         hostWriter.writeLine(
-            `  ${job.id.padEnd(maxTask)}  ${job.description ?? ""}`,
+            `${job.id.padEnd(maxTask)}  ${job.description ?? ""}`,
         );
     }
 }
@@ -214,7 +210,10 @@ export function consoleSink(message: Message): void {
                     case "list":
                         {
                             const listMessage = message as ListMessage;
+                            ansiWriter.writeLine(blue("> jobs"));
                             listJobs(listMessage.jobs);
+                            ansiWriter.writeLine()
+                            ansiWriter.writeLine(blue("> tasks"));
                             listTasks(listMessage.tasks);
                         }
                         break;

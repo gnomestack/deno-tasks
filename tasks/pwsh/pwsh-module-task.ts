@@ -29,7 +29,6 @@ export async function handlePwshModuleTask(ctx: IFireTaskExecutionContext)
     const task = ctx.task as PwshModuleTask;
     const result = new TaskResult(task);
     result.status = "running";
-
     if (ctx.signal.aborted) {
         result.status = "cancelled";
         return result;
@@ -80,6 +79,7 @@ export async function handlePwshModuleTask(ctx: IFireTaskExecutionContext)
         installed = listResult.code === 0 && listResult.stdoutLines.length > 0;
 
         if (task.state === 'present') {
+            console.log(`installed: ${installed}`);
             if (installed) {
                 ctx.bus.info(`PowerSehll module ${pkg.id} is already present.`);
                 continue;
@@ -114,8 +114,6 @@ export async function handlePwshModuleTask(ctx: IFireTaskExecutionContext)
             const lr = await ps.exec(
                 exe, 
                 splat, { 
-                    stdout: "piped", 
-                    stderr: "piped", 
                     signal: ctx.signal
                 });
 
@@ -163,8 +161,6 @@ export async function handlePwshModuleTask(ctx: IFireTaskExecutionContext)
             const lr = await ps.exec(
                 exe, 
                 splat, { 
-                    stdout: "piped", 
-                    stderr: "piped", 
                     signal: ctx.signal
                 });
 

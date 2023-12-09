@@ -2,7 +2,7 @@ import { IAnsiWriter } from "../deps.ts";
 
 export interface IRunnerOptions {
     cmds?: string[];
-    skipDeps?: boolean;
+    skipNeeds?: boolean;
     timeout?: number;
     help?: boolean;
     job?: boolean;

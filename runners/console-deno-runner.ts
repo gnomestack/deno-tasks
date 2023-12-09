@@ -68,7 +68,7 @@ export async function run(targets: string[], options: IRunnerOptions) {
             selection.push(job);
         }
 
-        if (!options.skipDeps) {
+        if (!options.skipNeeds) {
             const response = flattenJobs(selection, jobs, ctx.bus);
             if (response.failed) {
                 return 1;
@@ -96,7 +96,7 @@ export async function run(targets: string[], options: IRunnerOptions) {
             selection.push(task);
         }
 
-        if (!options.skipDeps) {
+        if (!options.skipNeeds) {
             const response = flattenTasks(selection, tasks, ctx.bus);
             if (response.failed) {
                 return 1;

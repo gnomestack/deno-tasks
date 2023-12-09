@@ -3,7 +3,6 @@ tasks:
   hello: 
     run: |
       sleep 1
-    timeout: "{{ 100 * 5}}"
 
   test:
     run: |
@@ -20,7 +19,11 @@ tasks:
     uses: docker://ubuntu
     with:
       args: bash -c 'echo hello world && echo \"$PWD\" && ls -la'
-
+  pwsh_mods:
+    uses: pwsh-module
+    with:
+      packages: ["powershell-yaml"]
+      scope: 'currentuser'
 jobs:
   test:
     steps:

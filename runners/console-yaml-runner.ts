@@ -1,6 +1,6 @@
 import { dotenv, fs, homeConfigDir, path, ps, trim, YAML } from "../deps.ts";
 import { consoleSink } from "./console-sink.ts";
-import { VersionMessage } from "./messages.ts";
+import { ListJobMessage, ListMessage, ListTaskMessage, VersionMessage } from "./messages.ts";
 import { RunnerExecutionContext } from "./runner-execution-context.ts";
 import { IRunnerOptions } from "./types.ts";
 import { detectTaskCycles, flattenTasks, IFireTask, tasks } from "../tasks/mod.ts";
@@ -155,6 +155,21 @@ export async function run(targets: string[], options: IRunnerOptions) {
 
     await importYamlFile(fireFile, ctx);
 
+    if (options.list) {
+        if (options.task) {
+            ctx.bus.send(new ListTaskMessage(options, tasks))
+            return 0
+        }
+
+        if (options.job) {
+            ctx.bus.send(new ListJobMessage(options, jobs))
+            return 0
+        }
+
+        ctx.bus.send(new ListMessage(options, tasks, jobs))
+        return 0;
+    }
+
     if (options.env) {
         for (const item of options.env) {
             const [key, value] = trim(item, '"').split("=");
@@ -185,7 +200,7 @@ export async function run(targets: string[], options: IRunnerOptions) {
             selection.push(job);
         }
 
-        if (!options.skipDeps) {
+        if (!options.skipNeeds) {
             const response = flattenJobs(selection, jobs, ctx.bus);
             if (response.failed) {
                 return 1;
@@ -215,7 +230,7 @@ export async function run(targets: string[], options: IRunnerOptions) {
             selection.push(task);
         }
 
-        if (!options.skipDeps) {
+        if (!options.skipNeeds) {
             const response = flattenTasks(selection, tasks, ctx.bus);
             if (response.failed) {
                 return 1;

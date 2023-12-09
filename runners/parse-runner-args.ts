@@ -77,7 +77,7 @@ export function handleArgs(args: string[], hostWriter: IAnsiWriter) {
 
     const options: IRunnerOptions = {
         cmds,
-        skipDeps: skipDeps,
+        skipNeeds: skipDeps,
         timeout: to,
         help: help,
         fireFile: fireFile,

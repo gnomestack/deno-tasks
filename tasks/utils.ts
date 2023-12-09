@@ -30,8 +30,18 @@ export function mapPackageTask(
 ): IFireTask {
     mapResourceTask(model, task);
 
-    if (model["packages"] && Array.isArray(model["packages"])) {
-        task.packages = model["packages"] as string[];
+    if (model["with"] && typeof model["with"] === "object") {
+        const withArgs = model["with"] as Record<string, unknown>;
+        if (withArgs["packages"]) {
+            if ( Array.isArray(withArgs["packages"])) {
+                task.packages = withArgs["packages"] as string[];
+            }
+
+            if (typeof withArgs["packages"] === "string") {
+                task.packages = [withArgs["packages"] as string];
+            }
+            
+        }
     }
 
     return task;
@@ -49,13 +59,11 @@ export function mapResourceTask(
 
     if (model["with"] && typeof model["with"] === "object") {
         task.with = model["with"] as Record<string, unknown>;
-    }
 
-    if (
-        model["state"] && typeof model["state"] === "string" &&
-        (model["state"] === "present" || model["state"] === "absent")
-    ) {
-        task.state = model["state"] as "present" | "absent";
+        const withArgs = model["with"] as Record<string, unknown>;
+        if (withArgs["state"] && typeof withArgs["state"] === "string") {
+            task.state = withArgs["state"] as "present" | "absent";
+        }
     }
 
     return task;

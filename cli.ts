@@ -14,7 +14,7 @@ program
     .option("-ef, --env-file <...envFile:string>", "Sets an environment variable from a file")
     .option("-l, --list", "List Targets")
     .option("-v, --version", "Print the version of the task runner")
-    .option("--skip-deps <skipDeps:boolean>", "Skips all task dependencies")
+    .option("--skip-needs", "Skips all task dependencies")
     .option("--cwd <cwd:string>", "Sets the working directory")
     .option("-t --timeout <timeout:number>", "The timeout in seconds for the task runner to complete")
     .option("--job", "Run jobs")
@@ -25,7 +25,7 @@ program
             envFile,
             list,
             version,
-            skipDeps,
+            skipNeeds,
             timeout,
             job,
             task,
@@ -39,7 +39,7 @@ program
             envFile,
             list,
             version,
-            skipDeps,
+            skipNeeds,
             timeout,
             job,
             task,

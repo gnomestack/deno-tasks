@@ -106,7 +106,6 @@ export async function handleDockerTask(ctx: IFireTaskExecutionContext) {
 registerTaskHandler(
     "docker",
     (model) => {
-        console.log("docker");
         if (model["uses"]) {
             const uses = model["uses"] as string;
             if (startsWithIgnoreCase(uses, "docker://")) {
