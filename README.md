@@ -9,12 +9,24 @@ Tasks are a unit of work that can have dependencies.
 By default the fire cli looks for a fire.yaml or ./.fire/default.yaml
 file that defines tasks and jobs.
 
-## Notes
-
-Handlbars is used to interpolate environment variables and secrets in tasks
-fields.  This may be replaced in future with some kind of expressions parser. 
 
 ## Install
+
+Use deno to install the cli as a named script by
+running `deno install --unstable -qAn qtr "https://deno.land/x/gs_fire@{VERSION}/cli.ts"`
+where `{VERSION}` is a specific version number that has been released.
+
+To install fire, run:
+
+```bash
+deno install --unstable -qAn fire "https://deno.land/x/gs_fire@{VERSION}/cli.ts"
+```
+
+To uninstall fire, run:
+
+```bash
+deno uninstall fire
+```
 
 
 ## Cli Options
@@ -30,7 +42,7 @@ fields.  This may be replaced in future with some kind of expressions parser.
 - **-t|--time-out** Sets the timeout in milliseconds for everything to run
 - **--job** Runs the jobs with ids that matches the targets
 - **--task** Runs the tasks with ids that matches the targets.
-- **--skip-needs** Skips any dependant tasks or jobs.
+- **--skip-needs** Skips running any dependent tasks or jobs.
 
 ## Vaults
 
@@ -39,7 +51,7 @@ various vaults.
 
 The current vaults that are supported are: 'dotenv', 'sops', 'keepass'.
 
-If the secret section exists, but the vault is not specificed, then 
+If the secret section exists, but the vault section does not exist, then 
 `keepass` is used as the default vault and is stored under the os equivelant of
 `${HOME}/.config/fire/default.kdbx`
 
@@ -152,7 +164,7 @@ secrets:
 ```
 ## Variables
 
-Environment variables can be set in the tasks.file and may 
+Environment variables can be set in fire.yaml and may 
 uses other variables to construct values.
 
 ```yaml
@@ -165,8 +177,8 @@ env:
 
 ## Tasks
 
-Tasks can be shared or used as stand alone tasks to be executed. By default
-the cli runner will execute tasks. 
+Tasks can be shared with jobs or executed as stand alone tasks. By default
+the cli runner will execute stand alone tasks. 
 
 ```bash
 # example is the name of the task to run
@@ -288,6 +300,11 @@ a ci/cd pipeline. Jobs may use pre-defined tasks to share code.
 When a task is run as a step of a job, the dependencies listed in the
 task's `needs` field is ignored.
 
+```bash
+#  job1 is the name of the job to run
+fire job1 --job
+```
+
 ```yaml
 tasks:
   ello:
@@ -312,3 +329,11 @@ jobs:
         shell: pwsh
 
 ```
+
+## Notes
+
+Handlbars is used to interpolate environment variables
+and secrets in tasks fields.  This may be replaced in 
+future with some kind of expressions parser. 
+
+Release under MIT License

@@ -38,6 +38,20 @@ tasks:
     uses: docker://ubuntu
     with:
       args: bash -c 'echo hello world && echo \"$PWD\" && ls -la'
+
+  ssh:
+    uses: "ssh"
+    run: |
+      uptime
+    with:
+      targets: ["10.0.1.60"]
+      user: "server_admin"
+
+  deno:
+    run: |
+      console.log("Hello World");
+
+    shell: deno
   pwsh_mods:
     uses: pwsh-module
     with:

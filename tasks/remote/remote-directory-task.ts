@@ -1,3 +1,4 @@
+/*
 import { ResourceTask } from "../fire-tasks.ts";
 import { IFireTaskExecutionContext } from "../types.ts";
 
@@ -19,3 +20,4 @@ export class RemoteDirectoryTask extends ResourceTask {
 async function handleRemoteDirectoryTask(ctx: IFireTaskExecutionContext) {
     console.log(ctx);
 }
+*/
