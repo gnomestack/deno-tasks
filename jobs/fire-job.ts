@@ -1,4 +1,4 @@
-import { isNullOrWhiteSpace, TimeoutException } from "../deps.ts";
+import { equalsIgnoreCase, isNullOrWhiteSpace, TimeoutException } from "../deps.ts";
 import { IExecutionContext } from "../execution/types.ts";
 import { hbs } from "../hbs/mod.ts";
 import { UnhandledErrorMessage } from "../message-bus/mod.ts";
@@ -87,6 +87,22 @@ export async function runJob(ctx: IFireJobExecutionContext) {
     const name = job.name ?? job.id;
 
     try {
+        const model = {
+            env: ctx.env,
+            secrets: ctx.secrets,
+            outputs: ctx.outputs,
+            defaults: ctx.defaults,
+        };
+        for(const k in job.env) {
+            if (job.env[k]) {
+                let v = job.env[k];
+                if (typeof v === 'string' && v.includes('{{')) {
+                    v = hbs.compile(v)(model);
+                    job.env[k] = v;
+                }
+            }
+        }
+
         if (typeof timeout === "function") {
             const r = timeout(ctx);
             if (r instanceof Promise) {
@@ -233,7 +249,7 @@ export function mapJob(model: Record<string, unknown>, job: IFireJob) {
                         return result;
                     }
 
-                    return result === "true";
+                    return equalsIgnoreCase(result, "true") || equalsIgnoreCase(result, "1");
                 };
             }
         }
@@ -254,7 +270,7 @@ export function mapJob(model: Record<string, unknown>, job: IFireJob) {
                         return result;
                     }
 
-                    return result === "true";
+                    return equalsIgnoreCase(result, "true") || result === "1";
                 };
             }
         }

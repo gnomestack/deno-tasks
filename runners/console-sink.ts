@@ -129,7 +129,7 @@ export function consoleSink(message: Message): void {
         case "warn":
             {
                 const msg = message as WarnMessage;
-                hostWriter.warn(msg.message);
+                hostWriter.writeLine(yellow(msg.message));
             }
             break;
         case "task-start":

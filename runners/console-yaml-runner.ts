@@ -1,4 +1,4 @@
-import { dotenv, fs, homeConfigDir, path, ps, trim, YAML } from "../deps.ts";
+import { dotenv, env, fs, homeConfigDir, osRelease, path, ps, trim, YAML } from "../deps.ts";
 import { consoleSink } from "./console-sink.ts";
 import { ListJobMessage, ListMessage, ListTaskMessage, VersionMessage } from "./messages.ts";
 import { RunnerExecutionContext } from "./runner-execution-context.ts";
@@ -16,8 +16,69 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
     const bus = ctx.bus;
 
     if (typeof fire !== "object") {
-        bus.error(new Error(`Invalid fire file: ${fireFile}`));
+        bus.error(new Error(`Invalid fire file: ${fireFile}. Must be a yaml object.`));
         return undefined;
+    }
+
+    if (fire["env"]) {
+        if (typeof fire["env"] !== "object") {
+            bus.warn(`yaml: ${fireFile} - env must be an object`)
+        } else {
+            for (const [key, value] of Object.entries(fire["env"] as Record<string, unknown>)) {
+                if (typeof value !== "string") {
+                    throw new Error(`Invalid value for env: ${key} in yaml file: ${fireFile}`);
+                }
+    
+                ctx.env[key] = env.expand(value, {
+                    getVariable: function(key) {
+                    
+                        let v = ctx.secrets[key];
+                        if (v === undefined) {
+                            v = ctx.env[key];
+                        }
+    
+                        if (v === undefined)
+                            v = env.get(key);
+    
+                        return v;
+                    }
+                });
+            }
+        }
+    }
+
+    if (fire["defaults"]) {
+        if (typeof fire["defaults"] !== "object") {
+            bus.warn(`yaml: ${fireFile} - defaults must be an object`)
+        } else {
+            for (const [key, value] of Object.entries(fire["defaults"] as Record<string, unknown>)) {
+                if (typeof value !== "string") {
+                    bus.error(new Error(`Invalid defaults definition: ${key}`));
+                    return undefined;
+                }
+    
+                ctx.defaults[key] = value;
+            }
+        }
+    }
+
+    if (typeof fire['secrets'] && typeof fire['secrets'] === 'object') {
+        if (!fire['vault']) {
+            fire['vault'] = {
+                'use': 'keepass',
+                'create': true
+            }
+            ctx.bus.debug("Vault not defined, using default which is keepass");
+        }
+
+        const mod = await import('./../vault/mod.ts');
+        const vault = await mod.handleVaultSection(fire, ctx);
+        if (vault === undefined) {
+            bus.error(new Error("Invalid vault definition"));
+            return undefined;
+        }
+
+        await mod.handleSecretSection(fire, vault, ctx);
     }
 
     // console.log(fire);
@@ -25,14 +86,12 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
     if (fire["tasks"]) {
         for (const [id, taskModel] of Object.entries(fire["tasks"] as Record<string, Record<string, unknown>>)) {
             if (typeof taskModel !== "object") {
-                bus.error(new Error(`Invalid task definition: ${id}`));
-                return undefined;
+                throw new Error(`Task ${id} must be a yaml object.`);
             }
 
             const entry = findTaskHandlerEntryByModel(taskModel);
             if (!entry) {
-                bus.error(new Error(`Invalid task definition: ${id}`));
-                return undefined;
+                throw new Error(`Task '${id}' has no handler for ${taskModel['uses']}`)
             }
             // console.log("entry", entry);
 
@@ -46,8 +105,7 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
     if (fire["jobs"]) {
         for (const [id, jobModel] of Object.entries(fire["jobs"] as Record<string, Record<string, unknown>>)) {
             if (typeof jobModel !== "object") {
-                bus.error(new Error(`Invalid job definition: ${id}`));
-                return undefined;
+                throw new Error(`Job ${id} must be a yaml object.`);
             }
 
             const job = new FireJob();
@@ -61,17 +119,17 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
 
             if (jobModel["steps"]) {
                 if (!Array.isArray(jobModel["steps"])) {
-                    bus.error(new Error(`Invalid job definition: ${id}. Steps must be an array `));
+                    bus.error(new Error(`Invalid job ${id}. Steps must be an array `));
                     return undefined;
                 }
 
                 const steps = jobModel["steps"] as unknown[];
-                for (const step of steps) {
+                for (let i = 0; i < steps.length; i++) {
+                    const step = steps[i];
                     if (typeof step === "string") {
                         const task = tasks.get(step);
                         if (!task) {
-                            bus.error(new Error(`Invalid job definition: ${id}. Task not found: ${step}`));
-                            return undefined;
+                            throw new Error(`Task '${step}' not found for job '${id}' at step ${i}`)
                         }
                         job.tasks.add(task);
                         continue;
@@ -79,10 +137,10 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
 
                     if (typeof step === "object") {
                         const taskModel = step as Record<string, unknown>;
+                        const name = taskModel.name || taskModel.id || i.toString();
                         const entry = findTaskHandlerEntryByModel(taskModel);
                         if (!entry) {
-                            bus.error(new Error(`Invalid task definition: ${id}`));
-                            return undefined;
+                            throw new Error(`Task '${name}' for job '${id}' at step ${i} has no handler for ${taskModel['uses']}`)
                         }
 
                         const task = entry.map(taskModel);
@@ -93,8 +151,7 @@ async function importYamlFile(fireFile: string, ctx: RunnerExecutionContext) {
                     }
                 }
             } else {
-                bus.error(new Error(`Invalid job definition: ${id}. Missing steps`));
-                return undefined;
+                throw new Error(`Job ${id} has zero steps. A job must have at least one step`);
             }
 
             jobs.add(job);
@@ -170,20 +227,65 @@ export async function run(targets: string[], options: IRunnerOptions) {
         return 0;
     }
 
+    ctx.env["OS"] = Deno.build.os;
+    try {
+        const r = osRelease();
+        ctx.env["OS_ID"] = r.id;
+        ctx.env["OS_VERSION"] = r.version;
+        ctx.env["OS_VERSION_ID"] = r.versionId;
+        ctx.env["OS_ID_LIKE"] = r.idLike;
+        ctx.env["OS_NAME"] = r.name;
+        ctx.env["OS_CODENAME"] = r.versionCodename;
+        ctx.env["OS_VARIANT_ID"] = r.variantId;
+        ctx.env["OS_VARIANT"] = r.variant;
+    } catch (error) {
+        ctx.bus.debug(error?.toString());
+    }
+
     if (options.env) {
         for (const item of options.env) {
             const [key, value] = trim(item, '"').split("=");
-            ctx.env[key] = value;
+            ctx.env[key] = env.expand(value, {
+                getVariable: function(key) {
+                    
+                    let v = ctx.secrets[key];
+                    if (v === undefined) {
+                        v = ctx.env[key];
+                    }
+
+                    if (v === undefined)
+                        v = env.get(key);
+
+                    return v;
+                }
+            });
         }
     }
+
+    
+
 
     if (options.envFile) {
         for (const item of options.envFile) {
             if (await fs.exists(item)) {
                 const content = await fs.readTextFile(item);
-                const env = dotenv.parse(content);
-                for (const key of Object.keys(env)) {
-                    ctx.env[key] = env[key];
+                const envData = dotenv.parse(content);
+                for (const key of Object.keys(envData)) {
+                    const value = envData[key];
+                    ctx.env[key] = env.expand(value, {
+                        getVariable: function(key) {
+                            
+                            let v = ctx.secrets[key];
+                            if (v === undefined) {
+                                v = ctx.env[key];
+                            }
+        
+                            if (v === undefined)
+                                v = env.get(key);
+        
+                            return v;
+                        }
+                    });
                 }
             }
         }
@@ -220,7 +322,6 @@ export async function run(targets: string[], options: IRunnerOptions) {
         return 0;
     } else {
         let selection: IFireTask[] = [];
-        // console.log(tasks.toArray());
         for (const target of targets) {
             const task = tasks.get(target);
             if (!task) {

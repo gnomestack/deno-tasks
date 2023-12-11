@@ -5,6 +5,7 @@ import { FireTask } from "./fire-tasks.ts";
 import { TaskExecutionContext } from "./task-execution-context.ts";
 import { findTaskHandlerEntryByTask } from "./task-handlers.ts";
 import { IFireTaskExecutionContext, ITaskResult, TaskResult } from "./types.ts";
+import { hbs } from "../hbs/mod.ts";
 
 export async function runTasks(tasks: FireTask[], ctx: IExecutionContext) {
     const results: ITaskResult[] = [];
@@ -20,6 +21,37 @@ export async function runTasks(tasks: FireTask[], ctx: IExecutionContext) {
             targetCtx.env,
             targetCtx.secrets,
         );
+
+        const model = { 
+            env: nextCtx.env,
+            secrets: nextCtx.secrets,
+            outputs: nextCtx.outputs,
+            defaults: nextCtx.defaults,
+        }
+        for(const k in task.env) {
+            if (task.env[k]) {
+                let v = task.env[k];
+                if (typeof v === 'string' && v.includes('{{')) {
+                    v = hbs.compile(v)(model);
+                    task.env[k] = v;
+                }
+                
+            }
+        }
+
+        if ((task as unknown as Record<string, unknown>).with) {
+            const withArgs = (task as unknown as Record<string, unknown>).with as Record<string, unknown>;
+            for(const k in withArgs) {
+                if (withArgs[k]) {
+                    let v = withArgs[k];
+                    if (typeof v === 'string' && v.includes('{{')) {
+                        v = hbs.compile(v)(model);
+                        withArgs[k] = v;
+                    }
+                }
+            }
+        }
+
         const result = await runTask(nextCtx, failed);
         results.push(result);
         if (result.status === "failed") {
@@ -49,16 +81,18 @@ export async function runTask(
         }
         const start = new Date();
 
-        let skip = task.if;
+        let condition = task.if
         let force = task.continueOnError;
-        if (typeof skip === "function") {
-            const result = skip(ctx);
+        if (typeof condition === "function") {
+            const result = condition(ctx);
             if (result instanceof Promise) {
-                skip = await result;
+                condition = await result;
             } else {
-                skip = result;
+                condition = result;
             }
         }
+
+        condition ??= true;
 
         if (typeof force === "function") {
             const result = force(ctx);
@@ -69,7 +103,7 @@ export async function runTask(
             }
         }
 
-        if (skip || (failed && !force)) {
+        if (!condition || (failed && !force)) {
             const result = new TaskResult(task);
             result.startAt = start;
             result.endAt = start;

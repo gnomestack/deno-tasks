@@ -1,4 +1,4 @@
-import { inflections, isNullOrEmpty, isNullOrWhiteSpace, trim, trimEnd, trimStart } from "../deps.ts";
+import { inflections, isNullOrEmpty, includesIgnoreCase, startsWithIgnoreCase, endsWithIgnoreCase, isNullOrWhiteSpace, trim, trimEnd, trimStart } from "../deps.ts";
 
 export const stringHelpers = {
     trim: function (str: string, chars?: string) {
@@ -10,6 +10,14 @@ export const stringHelpers = {
 
     trimStart: function (str: string, chars?: string) {
         return trimStart(str, chars);
+    },
+
+    startsWith: function (str: string, search: string) {
+        return startsWithIgnoreCase(str, search);
+    },
+
+    endsWith: function (str: string, search: string) {
+        return endsWithIgnoreCase(str, search);
     },
 
     quote: function (v: unknown) {
@@ -77,6 +85,6 @@ export const stringHelpers = {
             return str.includes(value as T);
         }
 
-        return str.toString().includes(value as string);
+        return includesIgnoreCase(str, value as string);
     },
 };

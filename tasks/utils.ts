@@ -1,7 +1,7 @@
 import { FireTask, PackageTask, ResourceTask } from "./fire-tasks.ts";
 import { hbs } from "../hbs/mod.ts";
 import { IFireTask, IFireTaskExecutionContext } from "./types.ts";
-import { SystemException } from "../deps.ts";
+import { SystemException, equalsIgnoreCase } from "../deps.ts";
 
 export class PackageOperationException extends SystemException {
     override name = "PackageOperationException";
@@ -82,7 +82,8 @@ export function mapFireTask(
     }
 
     if (model["env"] && typeof model["env"] === "object") {
-        task.env = model["env"] as Record<string, string>;
+        const envData = model["env"] as Record<string, string>;
+        task.env = envData;
     }
 
     if (model["timeout"]) {
@@ -122,8 +123,10 @@ export function mapFireTask(
                     secrets: ctx.secrets,
                 };
                 const tpl = hbs.compile(t);
-                const output = tpl(data);
-                return Boolean(output);
+                let output = tpl(data);
+                if (output)
+                    output = output.trim();
+                return equalsIgnoreCase(output, "true") || equalsIgnoreCase(output, "1");
             };
         }
     }

@@ -79,7 +79,6 @@ export async function handlePwshModuleTask(ctx: IFireTaskExecutionContext)
         installed = listResult.code === 0 && listResult.stdoutLines.length > 0;
 
         if (task.state === 'present') {
-            console.log(`installed: ${installed}`);
             if (installed) {
                 ctx.bus.info(`PowerSehll module ${pkg.id} is already present.`);
                 continue;

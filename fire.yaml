@@ -1,13 +1,32 @@
 
+vault:
+  uses: sops
+  create: true
+
+secrets:
+  MYSECRET: 
+    path: my.secret
+    create: true
+
+env:
+  RUN: "true"
+
 tasks:
   hello: 
     run: |
       sleep 1
 
-  test:
+  test_on_windows:
     run: |
-      Write-Host "Hello World"
+      Write-Host "{{ secrets.MYSECRET }}"
     shell: pwsh
+    if: "{{eq env.OS 'windows' }}"
+
+  test_on_linux:
+    run: |
+      Write-Host "{{ secrets.MYSECRET }}"
+    shell: pwsh
+    if: "{{eq env.OS 'linux' }}"
 
   has_deps:
     run: |
@@ -24,8 +43,17 @@ tasks:
     with:
       packages: ["powershell-yaml"]
       scope: 'currentuser'
+
+
 jobs:
+  install:
+    steps:
+      - id: install_mkcert
+        name: Install mkcert
+        uses: choco-package
+        with:
+          packages: ["mkcert"]
   test:
     steps:
       - hello
-      - test
+      - test_on_windows

@@ -8,6 +8,7 @@ import { detectTaskCycles, flattenTasks, tasks } from "../tasks/task-collection.
 import { runTasks } from "../tasks/task-runner.ts";
 import { IFireTask } from "../tasks/types.ts";
 import { consoleSink } from "./console-sink.ts";
+import { getFireDefaults } from "./globals.ts";
 import { importFireDenoFile } from "./import-fire-deno-file.ts";
 import { ListJobMessage, ListMessage, ListTaskMessage, VersionMessage } from "./messages.ts";
 import { RunnerExecutionContext } from "./runner-execution-context.ts";
@@ -21,6 +22,8 @@ export async function run(targets: string[], options: IRunnerOptions) {
         ctx.bus.send(new VersionMessage(options));
         return 0;
     }
+
+   
 
     if (options.env) {
         for (const item of options.env) {
@@ -55,6 +58,13 @@ export async function run(targets: string[], options: IRunnerOptions) {
             ctx.bus.send(new ListMessage(options, tasks, jobs));
         }
         return 0;
+    }
+
+    const defaults = getFireDefaults();
+    for (const [key, value] of Object.entries(defaults)) {
+        if (!ctx.defaults[key]) {
+            ctx.defaults[key] = value;
+        }
     }
 
     if (options.job) {

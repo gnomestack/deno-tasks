@@ -1,4 +1,5 @@
 import { Command } from "./deps.cli.ts";
+import { red } from "./deps.ts";
 import { run } from "./runners/console-runner.ts";
 import { IRunnerOptions } from "./runners/types.ts";
 
@@ -19,6 +20,15 @@ program
     .option("-t --timeout <timeout:number>", "The timeout in seconds for the task runner to complete")
     .option("--job", "Run jobs")
     .option("--task", "Run tasks")
+    .option("--params", "Parameters to pass to a given task")
+    .error((err) => {
+        if (err && err.stack)
+            console.log(red(err.stack));
+        else if (err)
+            console.log(red(err.message));
+    
+        Deno.exit(1);
+    })
     .action(async (
         {
             env,
@@ -46,6 +56,7 @@ program
             fireFile,
             workingDirectory: cwd,
         };
+        
         return await run(targets, options);
     });
 

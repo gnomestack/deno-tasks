@@ -47,7 +47,7 @@ export class ChocoPackageTask extends PackageTask {
                 break;
         }
 
-        this.uses = "chocolatey";
+        this.uses = "chocolatey-package";
     }
 }
 
@@ -175,7 +175,7 @@ registerTaskHandler(
         if (model["uses"]) {
             const uses = model["uses"] as string;
             if (
-                equalsIgnoreCase(uses, "chocolatey") || equalsIgnoreCase(uses, "choco")
+                equalsIgnoreCase(uses, "chocolatey-package") || equalsIgnoreCase(uses, "choco-package")
             ) {
                 return true;
             }

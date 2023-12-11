@@ -33,7 +33,6 @@ export async function handleAptPackageTask(ctx: IFireTaskExecutionContext) {
 
     const osr = osRelease();
     const isDebianLike = osr.isDebianLike || osr.isUbuntu;
-
     if (!isDebianLike) {
         const e = new PlatformNotSupportedException(
             "Apt is only supported on Debian or Debian-like systems.",
@@ -59,7 +58,7 @@ export async function handleAptPackageTask(ctx: IFireTaskExecutionContext) {
 
         let installed = false;
 
-        const lr = await ps.exec("apt", ["list", "-qq", pkg.id], {
+        const lr = await ps.exec("apt", ["list", "--installed", "-qq", pkg.id], {
             stdout: "piped",
             stderr: "piped",
             signal: ctx.signal,
@@ -100,8 +99,6 @@ export async function handleAptPackageTask(ctx: IFireTaskExecutionContext) {
             }
 
             const lr = await ps.exec(exe, splat, {
-                stdout: "piped",
-                stderr: "piped",
                 signal: ctx.signal,
             });
 
@@ -134,8 +131,6 @@ export async function handleAptPackageTask(ctx: IFireTaskExecutionContext) {
             }
 
             const lr = await ps.exec(exe, splat, {
-                stdout: "piped",
-                stderr: "piped",
                 signal: ctx.signal,
             });
 
@@ -151,7 +146,7 @@ registerTaskHandler(
     (model) => {
         if (model["uses"]) {
             const uses = model["uses"] as string;
-            if (equalsIgnoreCase(uses, "apt") || equalsIgnoreCase(uses, "apt-get")) {
+            if (equalsIgnoreCase(uses, "apt-package")) {
                 return true;
             }
         }
